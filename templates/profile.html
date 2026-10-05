@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile – ChatSpace</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    <style>
+        body { background: var(--bg-primary); display:flex; align-items:center; justify-content:center; min-height:100vh; }
+        .profile-page { max-width: 600px; width: 100%; margin: 2rem auto; padding: 1rem; }
+        .profile-card { background: var(--bg-card); border-radius: 16px; padding: 2rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+        .profile-avatar-section { display:flex; flex-direction:column; align-items:center; gap:1rem; margin-bottom:2rem; }
+        .profile-avatar-large { width:100px; height:100px; border-radius:50%; overflow:hidden; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:white; font-weight:700; cursor:pointer; position:relative; border: 3px solid var(--accent); }
+        .profile-avatar-large img { width:100%; height:100%; object-fit:cover; }
+        .avatar-upload-overlay { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.5); color:white; font-size:0.7rem; text-align:center; padding:4px; border-radius:0 0 50px 50px; }
+        .profile-section-title { font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:1rem; }
+        .back-link { display:inline-flex; align-items:center; gap:0.5rem; color:var(--accent); text-decoration:none; margin-bottom:1rem; font-weight:500; }
+        .msg-box { padding:0.75rem 1rem; border-radius:8px; margin-top:0.5rem; display:none; }
+        .msg-box.success { background:#d4edda; color:#155724; }
+        .msg-box.error { background:#f8d7da; color:#721c24; }
+        [data-theme="dark"] .msg-box.success { background:#1a4a2a; color:#a3d9b1; }
+        [data-theme="dark"] .msg-box.error { background:#4a1a1a; color:#d9a3a3; }
+    </style>
+</head>
+<body>
+    <div class="profile-page">
+        <a href="{{ url_for('chat.home') }}" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back to Chats
+        </a>
+
+        <div class="profile-card">
+            <div class="profile-avatar-section">
+                <div class="profile-avatar-large" id="profileAvatarDisplay" onclick="document.getElementById('profilePicInput').click()" title="Click to change profile picture">
+                    <img src="" alt="" id="profilePicImg" style="display:none">
+                    <span id="profileInitial">?</span>
+                    <div class="avatar-upload-overlay">Change</div>
+                </div>
+                <input type="file" id="profilePicInput" accept="image/*" style="display:none" onchange="uploadProfilePic(this)">
+                <h2 id="profileUsername" style="margin:0">Loading…</h2>
+                <small id="profileJoined" style="color:var(--text-muted)"></small>
+            </div>
+
+            <!-- Update Username -->
+            <p class="profile-section-title">Change Username</p>
+            <div class="form-group">
+                <input type="text" id="newUsername" placeholder="New username" class="form-input">
+            </div>
+            <button class="btn-primary" onclick="updateUsername()">Update Username</button>
+            <div class="msg-box" id="usernameMsg"></div>
+        </div>
+
+        <div class="profile-card">
+            <p class="profile-section-title">Change Password</p>
+            <div class="form-group">
+                <input type="password" id="currentPassword" placeholder="Current password" class="form-input">
+            </div>
+            <div class="form-group">
+                <input type="password" id="newPassword" placeholder="New password (min 6 chars)" class="form-input">
+            </div>
+            <div class="form-group">
+                <input type="password" id="confirmNewPassword" placeholder="Confirm new password" class="form-input">
+            </div>
+            <button class="btn-primary" onclick="updatePassword()">Change Password</button>
+            <div class="msg-box" id="passwordMsg"></div>
+        </div>
+
+        <div class="profile-card" style="text-align:center">
+            <a href="{{ url_for('auth.logout') }}" class="btn-primary" style="background:#e74c3c; display:inline-block; text-decoration:none;">
+                Log Out
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Load user info
+        async function loadProfile() {
+            const res = await fetch('/api/me');
+            const user = await res.json();
+            document.getElementById('profileUsername').textContent = user.username;
+            document.getElementById('profileInitial').textContent = user.username[0].toUpperCase();
+            document.getElementById('newUsername').value = user.username;
+            if (user.profile_picture) {
+                document.getElementById('profilePicImg').src = user.profile_picture;
+                document.getElementById('profilePicImg').style.display = 'block';
+                document.getElementById('profileInitial').style.display = 'none';
+            }
+        }
+
+        async function updateUsername() {
+            const username = document.getElementById('newUsername').value.trim();
+            const res = await fetch('/profile/username', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({username})
+            });
+            const data = await res.json();
+            showMsg('usernameMsg', data.message || data.error, res.ok ? 'success':'error');
+            if (res.ok) document.getElementById('profileUsername').textContent = username;
+        }
+
+        async function updatePassword() {
+            const body = {
+                current_password: document.getElementById('currentPassword').value,
+                new_password: document.getElementById('newPassword').value,
+                confirm_password: document.getElementById('confirmNewPassword').value
+            };
+            const res = await fetch('/profile/password', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            showMsg('passwordMsg', data.message || data.error, res.ok ? 'success':'error');
+            if (res.ok) {
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmNewPassword').value = '';
+            }
+        }
+
+        async function uploadProfilePic(input) {
+            if (!input.files.length) return;
+            const formData = new FormData();
+            formData.append('picture', input.files[0]);
+            const res = await fetch('/profile/picture', {method:'POST', body:formData});
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('profilePicImg').src = data.picture_url + '?t=' + Date.now();
+                document.getElementById('profilePicImg').style.display = 'block';
+                document.getElementById('profileInitial').style.display = 'none';
+            } else {
+                alert(data.error);
+            }
+        }
+
+        function showMsg(id, text, type) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = `msg-box ${type}`;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 4000);
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>
