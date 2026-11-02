@@ -58,7 +58,7 @@ class Config:
     # FLASK-SOCKETIO
     # Use "eventlet" in production for better WebSocket performance.
     # -----------------------------------------------------------------------
-    SOCKETIO_ASYNC_MODE = os.environ.get("SOCKETIO_ASYNC_MODE", "eventlet")
+    SOCKETIO_ASYNC_MODE = os.environ.get("SOCKETIO_ASYNC_MODE", "threading")
 
     # -----------------------------------------------------------------------
     # SESSION / SECURITY

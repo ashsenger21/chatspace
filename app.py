@@ -20,11 +20,6 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv()
 
-# eventlet monkey-patching MUST happen before any other imports for WebSocket
-# support in production. This makes standard Python I/O non-blocking.
-import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask, request
 from flask_login import LoginManager, current_user, login_required
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -297,15 +292,27 @@ def handle_message_read(data):
         "read_by": current_user.id,
     }, room=f"user_{other_id}")
 
-
 # ---------------------------------------------------------------------------
 # 7. Run the Server
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    print("Starting ChatSpace server...")
-    print("Open your browser and go to: http://localhost:5000")
-    print("Press Ctrl+C to stop the server.\n")
+    # Render sets the PORT environment variable automatically.
+    # Locally it defaults to 5000.
+    port = int(os.environ.get("PORT", 5000))
 
-    # debug=True auto-reloads when you save changes (great for development)
-    # use_reloader=False is required because SocketIO + debug reloader can conflict
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
+    # Use debug mode only in development (not in production)
+    is_dev = os.environ.get("FLASK_ENV") != "production"
+
+    if is_dev:
+        print("Starting ChatSpace server (development)...")
+        print(f"Open your browser and go to: http://localhost:{port}")
+        print("Press Ctrl+C to stop the server.\n")
+
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        debug=is_dev,
+        use_reloader=False,          # Must be False with SocketIO
+        allow_unsafe_werkzeug=is_dev # Only allow in dev mode
+    )
