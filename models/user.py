@@ -63,8 +63,17 @@ class User(UserMixin, db.Model):
     def get_profile_picture_url(self):
         """Return the URL path for the user's profile picture, or a default avatar."""
         if self.profile_picture:
+            # Clean up if saved with malformed prefix
+            if self.profile_picture.startswith("/uploads/images/http://") or self.profile_picture.startswith("/uploads/images/https://"):
+                return self.profile_picture[16:]
+            if self.profile_picture.startswith("/uploads/http://") or self.profile_picture.startswith("/uploads/https://"):
+                return self.profile_picture[9:]
+            # Cloudinary or other absolute URLs should be returned as-is
+            if self.profile_picture.startswith("http://") or self.profile_picture.startswith("https://"):
+                return self.profile_picture
+            if self.profile_picture.startswith("/uploads/"):
+                return self.profile_picture
             return f"/uploads/images/{self.profile_picture}"
-        # Return a data-URI placeholder so no extra HTTP request is needed
         return None  # Frontend will generate a default avatar from initials
 
     def update_last_seen(self):

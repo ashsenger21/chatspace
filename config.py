@@ -55,7 +55,7 @@ class Config:
 
     ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
     ALLOWED_VIDEO_EXTENSIONS = {"mp4", "webm", "mov"}
-    ALLOWED_AUDIO_EXTENSIONS = {"webm", "ogg", "mp3", "wav", "m4a"}
+    ALLOWED_AUDIO_EXTENSIONS = {"webm", "ogg", "mp3", "wav", "m4a", "mp4", "aac"}
 
     # -----------------------------------------------------------------------
     # FLASK-SOCKETIO

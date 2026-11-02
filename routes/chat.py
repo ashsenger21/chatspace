@@ -79,20 +79,20 @@ def save_upload(file, subfolder, allowed_extensions):
         # --- CLOUDINARY UPLOAD ---
         try:
             _setup_cloudinary()
-            # resource_type: image, video, or raw (for audio)
-            resource_type = "video" if subfolder == "videos" else (
-                "video" if subfolder == "audio" else "image"
-            )
+            file.seek(0)
+            # resource_type="auto" allows Cloudinary to automatically detect images, videos, and audio (webm, ogg, mp3, mp4)
             result = cloudinary.uploader.upload(
                 file,
                 folder=f"chatspace/{subfolder}",
-                resource_type=resource_type,
+                resource_type="auto",
                 unique_filename=True,
                 overwrite=False,
             )
             # Return the secure Cloudinary URL as the "path"
             return result["secure_url"], None
         except Exception as e:
+            current_app.logger.error(f"[CLOUDINARY UPLOAD ERROR] {e}")
+            print(f"[CLOUDINARY UPLOAD ERROR] {e}")
             return None, f"Upload failed: {str(e)}"
     else:
         # --- LOCAL DISK UPLOAD (development) ---
@@ -367,7 +367,11 @@ def mark_read(conv_id):
 def uploaded_file(filename):
     """
     Serve a file from the local uploads directory.
-    Only used when Cloudinary is NOT configured (local dev).
+    If the requested filename is an external URL, redirect directly to it.
     """
+    if filename.startswith("http://") or filename.startswith("https://"):
+        return redirect(filename)
+    if filename.startswith("images/http://") or filename.startswith("images/https://"):
+        return redirect(filename[7:])
     upload_folder = current_app.config["UPLOAD_FOLDER"]
     return send_from_directory(upload_folder, filename)

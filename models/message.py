@@ -48,6 +48,15 @@ class Message(db.Model):
         """Return the URL for this message's media file."""
         if not self.media_path:
             return None
+        # Clean up if saved with /uploads/http...
+        if self.media_path.startswith("/uploads/http://") or self.media_path.startswith("/uploads/https://"):
+            return self.media_path[9:]
+        # Cloudinary or other absolute URLs should be returned as-is
+        if self.media_path.startswith("http://") or self.media_path.startswith("https://"):
+            return self.media_path
+        # If already starts with /uploads/
+        if self.media_path.startswith("/uploads/"):
+            return self.media_path
         return f"/uploads/{self.media_path}"
 
     def to_dict(self):

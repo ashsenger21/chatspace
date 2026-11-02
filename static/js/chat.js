@@ -334,13 +334,15 @@ function buildBubbleContent(msg, isSent) {
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
                 </button>
-                <div class="voice-waveform">
+                <div class="voice-waveform" onclick="seekVoice('${audioId}', ${msg.id}, event)" style="cursor:pointer">
                     <div class="voice-waveform-progress" id="progress_${msg.id}"></div>
                 </div>
                 <span class="voice-duration" id="dur_${msg.id}">0:00</span>
-                <audio id="${audioId}" src="${msg.media_url}" preload="none"
+                <audio id="${audioId}" src="${msg.media_url}" preload="metadata"
+                    onloadedmetadata="initVoiceDuration('${audioId}', ${msg.id})"
                     onended="resetVoicePlayer('${audioId}', this)"
-                    ontimeupdate="updateVoiceProgress('${audioId}', ${msg.id})">
+                    ontimeupdate="updateVoiceProgress('${audioId}', ${msg.id})"
+                    onerror="handleVoiceError('${audioId}', ${msg.id})">
                 </audio>
             </div>`;
     }
@@ -369,16 +371,51 @@ function toggleVoice(audioId, btn) {
         document.querySelectorAll("audio").forEach(a => {
             if (a.id !== audioId && !a.paused) {
                 a.pause();
-                const otherBtn = document.querySelector(`[onclick*="${a.id}"]`);
+                const otherBtn = document.querySelector(`button[onclick*="${a.id}"]`);
                 if (otherBtn) setPlayIcon(otherBtn);
             }
         });
-        audio.play();
-        setPauseIcon(btn);
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                setPauseIcon(btn);
+            }).catch(err => {
+                console.error("Audio playback error:", err);
+                setPlayIcon(btn);
+                showToast("Could not play audio: " + (err.message || "playback error"), "error");
+            });
+        }
     } else {
         audio.pause();
         setPlayIcon(btn);
     }
+}
+
+function initVoiceDuration(audioId, msgId) {
+    const audio = document.getElementById(audioId);
+    const durEl = document.getElementById(`dur_${msgId}`);
+    if (audio && durEl && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        durEl.textContent = formatDuration(audio.duration);
+    }
+}
+
+function handleVoiceError(audioId, msgId) {
+    const durEl = document.getElementById(`dur_${msgId}`);
+    if (durEl) durEl.textContent = "Error";
+    console.warn(`Voice audio ${audioId} failed to load from source`);
+}
+
+function seekVoice(audioId, msgId, event) {
+    const audio = document.getElementById(audioId);
+    const waveform = event.currentTarget;
+    if (!audio || !waveform || isNaN(audio.duration) || !isFinite(audio.duration)) return;
+
+    const rect = waveform.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, clickX / rect.width));
+    audio.currentTime = pct * audio.duration;
+    updateVoiceProgress(audioId, msgId);
 }
 
 function setPlayIcon(btn) {
@@ -395,8 +432,13 @@ function resetVoicePlayer(audioId, audio) {
     const msgId = audioId.replace("audio_", "");
     const progress = document.getElementById(`progress_${msgId}`);
     if (progress) progress.style.width = "0%";
+    const audioEl = document.getElementById(audioId);
     const durEl = document.getElementById(`dur_${msgId}`);
-    if (durEl) durEl.textContent = "0:00";
+    if (durEl && audioEl && !isNaN(audioEl.duration) && isFinite(audioEl.duration)) {
+        durEl.textContent = formatDuration(audioEl.duration);
+    } else if (durEl) {
+        durEl.textContent = "0:00";
+    }
 }
 
 function updateVoiceProgress(audioId, msgId) {
@@ -405,12 +447,13 @@ function updateVoiceProgress(audioId, msgId) {
     const durEl    = document.getElementById(`dur_${msgId}`);
     if (!audio || !progress) return;
 
-    const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    const pct = (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration))
+        ? (audio.currentTime / audio.duration) * 100
+        : 0;
     progress.style.width = pct + "%";
 
     if (durEl) {
-        const remaining = audio.duration ? audio.duration - audio.currentTime : 0;
-        durEl.textContent = formatDuration(remaining);
+        durEl.textContent = formatDuration(audio.currentTime);
     }
 }
 
