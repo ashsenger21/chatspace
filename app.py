@@ -20,10 +20,10 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv()
 
-# gevent monkey-patching MUST happen before any other imports for WebSocket
+# eventlet monkey-patching MUST happen before any other imports for WebSocket
 # support in production. This makes standard Python I/O non-blocking.
-import gevent.monkey
-gevent.monkey.patch_all()
+import eventlet
+eventlet.monkey_patch()
 
 from flask import Flask, request
 from flask_login import LoginManager, current_user, login_required
