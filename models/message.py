@@ -61,6 +61,13 @@ class Message(db.Model):
 
     def to_dict(self):
         """Serialize the message for JSON API responses and WebSocket events."""
+        ts = self.timestamp
+        if ts is not None:
+            # If naive datetime from DB, append Z so JavaScript parses as UTC
+            ts_str = ts.isoformat() + "Z" if ts.tzinfo is None else ts.isoformat()
+        else:
+            ts_str = datetime.now(timezone.utc).isoformat()
+
         return {
             "id": self.id,
             "conversation_id": self.conversation_id,
@@ -70,7 +77,7 @@ class Message(db.Model):
             "message_type": self.message_type,
             "message_text": self.message_text,
             "media_url": self.get_media_url(),
-            "timestamp": self.timestamp.isoformat(),
+            "timestamp": ts_str,
             "is_read": self.is_read,
         }
 

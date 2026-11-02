@@ -17,8 +17,11 @@ import os
 from datetime import datetime, timezone
 
 # Load environment variables from .env file (ignored in production where env vars are set directly)
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from flask import Flask, request
 from flask_login import LoginManager, current_user, login_required

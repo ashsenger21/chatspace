@@ -85,12 +85,16 @@ class Conversation(db.Model):
         other    = self.other_user(current_user_id)
         last_msg = self.messages.order_by(sa.desc(Message.timestamp)).first()
 
+        created_str = None
+        if self.created_at:
+            created_str = self.created_at.isoformat() + "Z" if self.created_at.tzinfo is None else self.created_at.isoformat()
+
         return {
             "id": self.id,
             "other_user": other.to_dict() if other else None,
             "last_message": last_msg.to_dict() if last_msg else None,
             "unread_count": self.unread_count(current_user_id),
-            "created_at": self.created_at.isoformat(),
+            "created_at": created_str,
         }
 
     def __repr__(self):

@@ -83,12 +83,16 @@ class User(UserMixin, db.Model):
 
     def to_dict(self):
         """Convert user to a dictionary for JSON responses."""
+        ls_str = None
+        if self.last_seen:
+            ls_str = self.last_seen.isoformat() + "Z" if self.last_seen.tzinfo is None else self.last_seen.isoformat()
+
         return {
             "id": self.id,
             "username": self.username,
             "profile_picture": self.get_profile_picture_url(),
             "is_online": self.is_online,
-            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
+            "last_seen": ls_str,
         }
 
     def __repr__(self):

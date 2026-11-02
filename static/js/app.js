@@ -339,20 +339,37 @@ function escapeHtml(str) {
         .replace(/'/g, "&#39;");
 }
 
-// ─── Utility: Format Timestamp ───────────────────────────────
+// ─── Utility: Parse and Format Timestamps ─────────────────────
+function parseDate(isoString) {
+    if (!isoString) return new Date();
+    if (typeof isoString === "string") {
+        // If string has 'T' and no timezone indicator (no Z and no +/- offset), treat as UTC by appending 'Z'
+        if (isoString.includes("T") && !isoString.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(isoString)) {
+            isoString = isoString + "Z";
+        }
+    }
+    const d = new Date(isoString);
+    return isNaN(d.getTime()) ? new Date() : d;
+}
+
+function getDaysDifference(date, now) {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfMsgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    return Math.round((startOfToday - startOfMsgDay) / 86400000);
+}
+
 function formatTime(isoString) {
     if (!isoString) return "";
-    const date = new Date(isoString);
+    const date = parseDate(isoString);
     const now  = new Date();
-    const diff = now - date;
-    const days = Math.floor(diff / 86400000);
+    const days = getDaysDifference(date, now);
 
     if (days === 0) {
-        // Today: show time
-        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        // Today: show 12-hour time (e.g. "9:15 PM")
+        return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
     } else if (days === 1) {
         return "Yesterday";
-    } else if (days < 7) {
+    } else if (days > 1 && days < 7) {
         return date.toLocaleDateString([], { weekday: "short" });
     } else {
         return date.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -361,16 +378,43 @@ function formatTime(isoString) {
 
 function formatFullTime(isoString) {
     if (!isoString) return "";
-    return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const date = parseDate(isoString);
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 function formatDateLabel(isoString) {
-    const date = new Date(isoString);
+    if (!isoString) return "";
+    const date = parseDate(isoString);
     const now  = new Date();
-    const diff = Math.floor((now - date) / 86400000);
-    if (diff === 0)  return "Today";
-    if (diff === 1)  return "Yesterday";
-    return date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+    const days = getDaysDifference(date, now);
+
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days > 1 && days < 7) {
+        return date.toLocaleDateString([], { weekday: "long" });
+    }
+    if (date.getFullYear() === now.getFullYear()) {
+        return date.toLocaleDateString([], { month: "long", day: "numeric" });
+    }
+    return date.toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" });
+}
+
+function formatLastSeen(isoString) {
+    if (!isoString) return "Offline";
+    const date = parseDate(isoString);
+    const now  = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+
+    if (diffMin < 1) return "just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+
+    const days = getDaysDifference(date, now);
+    const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+    if (days === 0) return `today at ${timeStr}`;
+    if (days === 1) return `yesterday at ${timeStr}`;
+    return `on ${date.toLocaleDateString([], { month: "short", day: "numeric" })}`;
 }
 
 // ─── App Init ────────────────────────────────────────────────

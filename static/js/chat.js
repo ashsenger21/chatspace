@@ -193,8 +193,7 @@ function updateChatHeaderStatus(isOnline, lastSeen) {
         statusEl.textContent = "Online";
         statusEl.className   = "chat-status online";
     } else if (lastSeen) {
-        const ago = formatTime(lastSeen);
-        statusEl.textContent = `Last seen ${ago}`;
+        statusEl.textContent = `Last seen ${formatLastSeen(lastSeen)}`;
         statusEl.className   = "chat-status";
     } else {
         statusEl.textContent = "Offline";
@@ -254,13 +253,14 @@ function renderMessages(messages, prepend = false) {
     const loadMoreWrapper = document.getElementById("loadMoreWrapper");
 
     messages.forEach(msg => {
-        const msgDate = new Date(msg.timestamp).toDateString();
+        const msgDate = parseDate(msg.timestamp).toDateString();
 
         // Insert date separator when the date changes
         if (msgDate !== lastDate) {
             const sep = document.createElement("div");
-            sep.className = "date-separator";
-            sep.innerHTML = `<span>${formatDateLabel(msg.timestamp)}</span>`;
+            sep.className    = "date-separator";
+            sep.dataset.date = msgDate;
+            sep.innerHTML    = `<span>${formatDateLabel(msg.timestamp)}</span>`;
             fragment.appendChild(sep);
             lastDate = msgDate;
         }
@@ -471,7 +471,7 @@ function appendMessage(msg) {
 
     // Check if we need a date separator
     const lastSep = container.querySelector(".date-separator:last-of-type");
-    const msgDate = new Date(msg.timestamp).toDateString();
+    const msgDate = parseDate(msg.timestamp).toDateString();
     const lastDate = lastSep ? lastSep.dataset.date : null;
 
     if (msgDate !== lastDate) {
