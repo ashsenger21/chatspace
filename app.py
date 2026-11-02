@@ -303,10 +303,7 @@ if __name__ == "__main__":
     # Use debug mode only in development (not in production)
     is_dev = os.environ.get("FLASK_ENV") != "production"
 
-    if is_dev:
-        print("Starting ChatSpace server (development)...")
-        print(f"Open your browser and go to: http://localhost:{port}")
-        print("Press Ctrl+C to stop the server.\n")
+    print(f"Starting ChatSpace server on port {port}...")
 
     socketio.run(
         app,
@@ -314,5 +311,5 @@ if __name__ == "__main__":
         port=port,
         debug=is_dev,
         use_reloader=False,          # Must be False with SocketIO
-        allow_unsafe_werkzeug=is_dev # Only allow in dev mode
+        allow_unsafe_werkzeug=True   # Required when running development server directly in production
     )
