@@ -8,6 +8,7 @@ python-engineio==4.9.1
 requests==2.34.2
 psycopg2-binary==2.9.9
 gunicorn==22.0.0
-eventlet==0.36.1
+gevent==24.2.1
+gevent-websocket==0.10.1
 cloudinary==1.41.0
 python-dotenv==1.0.1
