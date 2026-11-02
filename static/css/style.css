@@ -406,10 +406,31 @@ html, body {
     gap: 0.75rem;
     flex-shrink: 0;
     box-shadow: var(--shadow);
+    min-height: 62px;
+    z-index: 5;
+    position: relative;
 }
 
 .back-to-list {
-    display: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0;
+    transition: background var(--transition), color var(--transition);
+    margin-right: 0.15rem;
+}
+
+.back-to-list:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 .chat-header-info {
@@ -417,28 +438,41 @@ html, body {
     align-items: center;
     gap: 0.75rem;
     flex: 1;
-    cursor: pointer;
+    min-width: 0;
     border-radius: 8px;
-    padding: 0.25rem;
-    transition: background var(--transition);
+    padding: 0.25rem 0.4rem;
 }
 
-.chat-header-info:hover { background: var(--bg-secondary); }
-
-.chat-user-details { display: flex; flex-direction: column; }
+.chat-user-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    justify-content: center;
+}
 
 .chat-username {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.05rem;
     color: var(--text-primary);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .chat-status {
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.chat-status.online { color: var(--accent); }
+.chat-status.online {
+    color: var(--accent);
+    font-weight: 500;
+}
 
 .chat-header-actions {
     display: flex;

@@ -140,19 +140,31 @@ async function openConversation(convId) {
     document.getElementById("welcomeScreen").style.display = "none";
     document.getElementById("chatWindow").style.display    = "flex";
 
+    // Immediate optimistic header update if already in memory
+    const cached = conversations.find(c => c.id === convId);
+    if (cached && cached.other_user) {
+        currentOtherUser = cached.other_user;
+        updateChatHeader(currentOtherUser);
+    }
+
     // Clear messages
     const container = document.getElementById("messagesContainer");
     container.innerHTML = `<div style="text-align:center;padding:2rem"><div class="spinner"></div></div>`;
 
-    // Load conversation details
+    // Load fresh conversation details
     try {
         const res  = await fetch(`/api/conversation/${convId}`);
-        const data = await res.json();
-        currentOtherUser = data.other_user;
-        updateChatHeader(currentOtherUser);
+        if (res.ok) {
+            const data = await res.json();
+            currentOtherUser = data.other_user;
+            updateChatHeader(currentOtherUser);
+        }
     } catch (e) {
-        showToast("Failed to load conversation.", "error");
-        return;
+        console.warn("Could not refresh conversation header:", e);
+    }
+
+    if (!currentOtherUser) {
+        showToast("Failed to load conversation details.", "error");
     }
 
     // Join SocketIO room
@@ -174,12 +186,13 @@ async function openConversation(convId) {
 
 // ─── Update Chat Header ──────────────────────────────────────
 function updateChatHeader(user) {
+    if (!user) return;
     const imgEl   = document.getElementById("chatAvatarImg");
     const initEl  = document.getElementById("chatAvatarInitial");
     const wrapper = document.getElementById("chatAvatar");
     const nameEl  = document.getElementById("chatUsername");
 
-    if (nameEl)    nameEl.textContent = user.username;
+    if (nameEl)    nameEl.textContent = user.username || "User";
     if (imgEl && initEl && wrapper) setAvatar(imgEl, initEl, user, wrapper);
 
     updateChatHeaderStatus(user.is_online, user.last_seen);

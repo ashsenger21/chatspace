@@ -320,12 +320,25 @@ function closeProfileModal(event) {
     }
 }
 
-// ─── Mobile: back to conversation list ──────────────────────
+// ─── Back to conversation list (mobile & desktop) ────────────
 function backToList() {
-    document.getElementById("sidebar").classList.remove("hidden");
-    document.getElementById("chatWindow").style.display   = "none";
-    document.getElementById("welcomeScreen").style.display = "flex";
-    activeConvId = null;
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) sidebar.classList.remove("hidden");
+
+    const chatWindow = document.getElementById("chatWindow");
+    if (chatWindow) chatWindow.style.display = "none";
+
+    const welcome = document.getElementById("welcomeScreen");
+    if (welcome) welcome.style.display = "flex";
+
+    if (typeof socket !== "undefined" && socket && typeof currentConvId !== "undefined" && currentConvId) {
+        socket.emit("leave_conversation", { conversation_id: currentConvId });
+    }
+    if (typeof activeConvId !== "undefined") activeConvId = null;
+    if (typeof currentConvId !== "undefined") currentConvId = null;
+    if (typeof currentOtherUser !== "undefined") currentOtherUser = null;
+
+    document.querySelectorAll(".conversation-item").forEach(el => el.classList.remove("active"));
 }
 
 // ─── Utility: Escape HTML ────────────────────────────────────
