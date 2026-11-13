@@ -229,11 +229,19 @@ def send_message(conv_id):
     if len(text) > 5000:
         return jsonify({"error": "Message is too long (max 5000 characters)."}), 400
 
+    reply_to_id = (data or {}).get("reply_to_id")
+    if reply_to_id:
+        try:
+            reply_to_id = int(reply_to_id)
+        except (ValueError, TypeError):
+            reply_to_id = None
+
     msg = Message(
         conversation_id=conv_id,
         sender_id=current_user.id,
         message_type="text",
         message_text=text,
+        reply_to_id=reply_to_id,
     )
     db.session.add(msg)
     db.session.commit()
@@ -271,11 +279,19 @@ def send_media(conv_id):
     if err:
         return jsonify({"error": err}), 400
 
+    reply_to_id = request.form.get("reply_to_id")
+    if reply_to_id:
+        try:
+            reply_to_id = int(reply_to_id)
+        except (ValueError, TypeError):
+            reply_to_id = None
+
     msg = Message(
         conversation_id=conv_id,
         sender_id=current_user.id,
         message_type=media_type,
         media_path=saved_path,
+        reply_to_id=reply_to_id,
     )
     db.session.add(msg)
     db.session.commit()

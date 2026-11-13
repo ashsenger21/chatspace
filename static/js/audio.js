@@ -162,6 +162,9 @@ async function uploadAudio(blob, filename) {
     const formData = new FormData();
     formData.append("file", blob, filename);
     formData.append("type", "audio");
+    if (typeof activeReply !== "undefined" && activeReply) {
+        formData.append("reply_to_id", activeReply.id);
+    }
 
     try {
         const res = await fetch(`/api/conversation/${currentConvId}/send_media`, {
@@ -185,6 +188,9 @@ async function uploadAudio(blob, filename) {
             });
         }
 
+        if (typeof cancelReply === "function") {
+            cancelReply();
+        }
         showToast("Voice message sent!", "success");
     } catch (e) {
         showToast("Failed to upload voice message.", "error");

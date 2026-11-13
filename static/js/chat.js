@@ -24,6 +24,7 @@ let isTyping        = false;  // Are we currently sending "typing" events?
 let oldestMsgId     = null;   // For pagination (load older messages)
 let hasMoreMessages = false;  // Whether there are older messages to load
 let pendingMedia    = null;   // { file, type } waiting to be sent
+let activeReply     = null;   // Currently active reply target { id, sender_username, text, type }
 
 // ─── WebSocket Initialisation ────────────────────────────────
 /**
@@ -125,6 +126,7 @@ async function openConversation(convId) {
     activeConvId  = convId;
     oldestMsgId   = null;
     hasMoreMessages = false;
+    cancelReply();
 
     // Highlight in sidebar
     document.querySelectorAll(".conversation-item").forEach(el => {
@@ -296,6 +298,12 @@ function buildMessageElement(msg) {
     wrapper.className = `message-wrapper ${isSent ? "sent" : "received"}`;
     wrapper.dataset.msgId = msg.id;
 
+    // Swipe reply indicator (animates behind bubble when sliding)
+    const swipeIcon = document.createElement("div");
+    swipeIcon.className = "swipe-reply-indicator";
+    swipeIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
+    wrapper.appendChild(swipeIcon);
+
     // Avatar (for received messages only)
     if (!isSent && currentOtherUser) {
         const color    = getAvatarColor(currentOtherUser.id);
@@ -313,11 +321,36 @@ function buildMessageElement(msg) {
     bubble.innerHTML = buildBubbleContent(msg, isSent);
     wrapper.appendChild(bubble);
 
+    // Desktop hover reply button
+    const replyBtn = document.createElement("button");
+    replyBtn.className = "bubble-reply-btn";
+    replyBtn.title = "Reply (or slide right)";
+    replyBtn.setAttribute("aria-label", "Reply to message");
+    replyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
+    replyBtn.onclick = (e) => {
+        e.stopPropagation();
+        setReplyTo(msg);
+    };
+    wrapper.appendChild(replyBtn);
+
+    // Attach slide/swipe-to-reply gesture
+    attachSwipeToReply(bubble, wrapper, msg);
+
     return wrapper;
 }
 
 function buildBubbleContent(msg, isSent) {
     let content = "";
+
+    // Quoted reply message (if this message is a reply to another)
+    let quotedHtml = "";
+    if (msg.reply_to) {
+        quotedHtml = `
+            <div class="quoted-message" onclick="scrollToMessage(${msg.reply_to.id})">
+                <div class="quoted-sender">${escapeHtml(msg.reply_to.sender_username)}</div>
+                <div class="quoted-text">${escapeHtml(msg.reply_to.preview_text)}</div>
+            </div>`;
+    }
 
     if (msg.message_type === "text") {
         content = `<div class="bubble-text">${escapeHtml(msg.message_text)}</div>`;
@@ -359,6 +392,9 @@ function buildBubbleContent(msg, isSent) {
                 </audio>
             </div>`;
     }
+
+    // Prepend quoted reply above the main content
+    content = quotedHtml + content;
 
     // Timestamp and read ticks
     const tick = isSent
@@ -477,6 +513,190 @@ function formatDuration(seconds) {
     return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// ─── Swipe & Quoted Reply Helpers ──────────────────────────
+function setReplyTo(msg) {
+    if (!msg) return;
+
+    let senderName = msg.sender_username;
+    if (msg.sender_id === currentUser.id) {
+        senderName = "You";
+    } else if (currentOtherUser && msg.sender_id === currentOtherUser.id) {
+        senderName = currentOtherUser.username;
+    }
+    senderName = senderName || "User";
+
+    let preview = msg.message_text;
+    if (msg.message_type === "image") preview = "📷 Photo";
+    else if (msg.message_type === "video") preview = "🎬 Video";
+    else if (msg.message_type === "audio") preview = "🎙️ Voice message";
+    else if (!preview) preview = "Attachment";
+
+    activeReply = {
+        id: msg.id,
+        sender_username: senderName,
+        text: preview,
+        type: msg.message_type
+    };
+
+    const bar = document.getElementById("replyPreviewBar");
+    const senderEl = document.getElementById("replyPreviewSender");
+    const textEl = document.getElementById("replyPreviewText");
+
+    if (senderEl) senderEl.textContent = `Replying to ${senderName}`;
+    if (textEl) textEl.textContent = (preview && preview.length > 80) ? preview.slice(0, 80) + "…" : (preview || "");
+    if (bar) bar.style.display = "flex";
+
+    const input = document.getElementById("messageInput");
+    if (input) input.focus();
+}
+
+function cancelReply() {
+    activeReply = null;
+    const bar = document.getElementById("replyPreviewBar");
+    if (bar) bar.style.display = "none";
+}
+
+function scrollToMessage(msgId) {
+    if (!msgId) return;
+    const targetWrapper = document.querySelector(`[data-msg-id="${msgId}"]`);
+    if (!targetWrapper) {
+        showToast("Original message not loaded in view", "info");
+        return;
+    }
+
+    targetWrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+    const bubble = targetWrapper.querySelector(".bubble");
+    if (bubble) {
+        bubble.classList.remove("highlight-pulse");
+        void bubble.offsetWidth; // Force CSS reflow to re-trigger keyframe
+        bubble.classList.add("highlight-pulse");
+        setTimeout(() => {
+            bubble.classList.remove("highlight-pulse");
+        }, 1600);
+    }
+}
+
+function attachSwipeToReply(bubble, wrapper, msg) {
+    if (!bubble || !wrapper) return;
+
+    const indicator = wrapper.querySelector(".swipe-reply-indicator");
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let isDragging = false;
+    let isHorizontal = null;
+    let hasVibrated = false;
+    const threshold = 55;
+    const maxDrag   = 85;
+
+    function onPointerDown(e) {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        // Don't intercept clicks on buttons, links, video, audio, or lightbox trigger
+        if (e.target.closest("button, a, video, audio, .quoted-message, .chat-image")) return;
+
+        startX = e.clientX;
+        startY = e.clientY;
+        currentX = 0;
+        isDragging = false;
+        isHorizontal = null;
+        hasVibrated = false;
+
+        bubble.addEventListener("pointermove", onPointerMove);
+        bubble.addEventListener("pointerup", onPointerUp);
+        bubble.addEventListener("pointercancel", onPointerUp);
+    }
+
+    function onPointerMove(e) {
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+
+        if (isHorizontal === null) {
+            const absX = Math.abs(deltaX);
+            const absY = Math.abs(deltaY);
+            if (absX > 8 || absY > 8) {
+                // If moving horizontally to the right:
+                if (absX > absY && deltaX > 0) {
+                    isHorizontal = true;
+                    isDragging = true;
+                    bubble.style.touchAction = "none";
+                    try { bubble.setPointerCapture(e.pointerId); } catch (_) {}
+                } else {
+                    isHorizontal = false;
+                    cleanup(e);
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        if (!isHorizontal || !isDragging) return;
+
+        const clampedDeltaX = Math.max(0, deltaX);
+        currentX = Math.min(maxDrag, clampedDeltaX * 0.75);
+
+        bubble.style.transition = "none";
+        bubble.style.transform = `translateX(${currentX}px)`;
+
+        if (indicator) {
+            const progress = Math.min(1, currentX / threshold);
+            indicator.style.opacity = progress;
+            indicator.style.transform = `translateY(-50%) scale(${0.6 + progress * 0.4})`;
+
+            const bubbleLeft = bubble.offsetLeft;
+            indicator.style.left = `${bubbleLeft + (currentX - 28) / 2}px`;
+
+            if (currentX >= threshold) {
+                if (!indicator.classList.contains("ready")) {
+                    indicator.classList.add("ready");
+                    if (!hasVibrated && navigator.vibrate) {
+                        try { navigator.vibrate(25); } catch (_) {}
+                        hasVibrated = true;
+                    }
+                }
+            } else {
+                indicator.classList.remove("ready");
+                hasVibrated = false;
+            }
+        }
+    }
+
+    function onPointerUp(e) {
+        if (isDragging && isHorizontal) {
+            bubble.style.transition = "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+            bubble.style.transform = "";
+
+            if (indicator) {
+                const wasReady = indicator.classList.contains("ready");
+                indicator.style.transition = "opacity 0.2s, transform 0.2s";
+                indicator.style.opacity = "0";
+                indicator.style.transform = "translateY(-50%) scale(0.6)";
+                indicator.classList.remove("ready");
+
+                if (wasReady) {
+                    setReplyTo(msg);
+                }
+            }
+        }
+
+        cleanup(e);
+    }
+
+    function cleanup(e) {
+        if (e && e.pointerId) {
+            try { bubble.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+        bubble.style.touchAction = "";
+        bubble.removeEventListener("pointermove", onPointerMove);
+        bubble.removeEventListener("pointerup", onPointerUp);
+        bubble.removeEventListener("pointercancel", onPointerUp);
+        isDragging = false;
+        isHorizontal = null;
+    }
+
+    bubble.addEventListener("pointerdown", onPointerDown);
+}
+
 // ─── Append a Single New Message ────────────────────────────
 function appendMessage(msg) {
     const container = document.getElementById("messagesContainer");
@@ -518,13 +738,15 @@ function sendTextMessage() {
     // Emit via WebSocket (server saves + broadcasts)
     socket.emit("send_message", {
         conversation_id: currentConvId,
-        text:            text
+        text:            text,
+        reply_to_id:     activeReply ? activeReply.id : null
     });
 
     // Clear input
     input.value = "";
     autoResize(input);
     input.focus();
+    cancelReply();
 
     // Stop typing indicator
     stopTyping();
@@ -633,6 +855,7 @@ async function sendMediaMessage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("type", type);
+    if (activeReply) formData.append("reply_to_id", activeReply.id);
 
     // Disable preview buttons while uploading
     showToast("Uploading…");
@@ -660,6 +883,7 @@ async function sendMediaMessage() {
         }
 
         cancelMediaPreview();
+        cancelReply();
         showToast("Sent!", "success");
     } catch (e) {
         showToast("Failed to send media.", "error");

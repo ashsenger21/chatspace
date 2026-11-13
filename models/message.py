@@ -40,6 +40,10 @@ class Message(db.Model):
     # Has the recipient read this message?
     is_read = db.Column(db.Boolean, default=False)
 
+    # Replying to another message (optional)
+    reply_to_id = db.Column(db.Integer, db.ForeignKey("messages.id"), nullable=True)
+    reply_to = db.relationship("Message", remote_side=[id], foreign_keys=[reply_to_id])
+
     # ------------------------------------------------------------------
     # Helper methods
     # ------------------------------------------------------------------
@@ -68,6 +72,33 @@ class Message(db.Model):
         else:
             ts_str = datetime.now(timezone.utc).isoformat()
 
+        reply_data = None
+        target_reply = self.reply_to
+        if not target_reply and self.reply_to_id:
+            try:
+                target_reply = db.session.get(Message, self.reply_to_id)
+            except Exception:
+                target_reply = None
+
+        if target_reply:
+            preview = target_reply.message_text
+            if target_reply.message_type == "image":
+                preview = "📷 Photo"
+            elif target_reply.message_type == "video":
+                preview = "🎬 Video"
+            elif target_reply.message_type == "audio":
+                preview = "🎙️ Voice message"
+            elif not preview:
+                preview = "Attachment"
+
+            reply_data = {
+                "id": target_reply.id,
+                "sender_id": target_reply.sender_id,
+                "sender_username": target_reply.sender.username if target_reply.sender else "Unknown",
+                "message_type": target_reply.message_type,
+                "preview_text": (preview[:80] + "…") if len(preview or "") > 80 else (preview or ""),
+            }
+
         return {
             "id": self.id,
             "conversation_id": self.conversation_id,
@@ -79,6 +110,7 @@ class Message(db.Model):
             "media_url": self.get_media_url(),
             "timestamp": ts_str,
             "is_read": self.is_read,
+            "reply_to": reply_data,
         }
 
     def __repr__(self):

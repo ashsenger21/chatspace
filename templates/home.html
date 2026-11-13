@@ -190,6 +190,16 @@
 
             <!-- Message Composer -->
             <div class="composer" id="composer">
+                <!-- Reply preview banner -->
+                <div class="reply-preview-bar" id="replyPreviewBar" style="display:none">
+                    <div class="reply-preview-accent"></div>
+                    <div class="reply-preview-body">
+                        <div class="reply-preview-sender" id="replyPreviewSender">Replying to User</div>
+                        <div class="reply-preview-text" id="replyPreviewText">Message preview</div>
+                    </div>
+                    <button class="reply-preview-close" onclick="cancelReply()" title="Cancel reply" aria-label="Cancel reply">✕</button>
+                </div>
+
                 <!-- Media preview (shown before sending) -->
                 <div class="media-preview" id="mediaPreview" style="display:none">
                     <div class="preview-content" id="previewContent"></div>
