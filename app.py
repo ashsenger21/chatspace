@@ -91,17 +91,16 @@ with app.app_context():
     # Ensure reply_to_id column exists in existing database
     try:
         import sqlalchemy as sa
-        with db.engine.connect() as conn:
+        with db.engine.begin() as conn:
             if db.engine.dialect.name == "postgresql":
-                conn.execute(sa.text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER REFERENCES messages(id);"))
-                conn.commit()
+                conn.execute(sa.text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER;"))
             elif db.engine.dialect.name == "sqlite":
                 cols = [c[1] for c in conn.execute(sa.text("PRAGMA table_info(messages);")).fetchall()]
-                if "reply_to_id" not in cols:
-                    conn.execute(sa.text("ALTER TABLE messages ADD COLUMN reply_to_id INTEGER REFERENCES messages(id);"))
-                    conn.commit()
+                if cols and "reply_to_id" not in cols:
+                    conn.execute(sa.text("ALTER TABLE messages ADD COLUMN reply_to_id INTEGER;"))
+        print("[OK] reply_to_id column verified/created in database.")
     except Exception as e:
-        print(f"[DB SCHEMA CHECK] Notice: {e}")
+        print(f"[DB SCHEMA CHECK] Error: {e}")
     print("[OK] Database tables created/verified.")
 
 
