@@ -87,9 +87,9 @@ app.register_blueprint(profile_bp)
 # 5. Create database tables (runs once when the app starts)
 # ---------------------------------------------------------------------------
 with app.app_context():
-    db.create_all()
-    # Ensure reply_to_id column exists in existing database
     try:
+        db.create_all()
+        # Ensure reply_to_id column exists in existing database
         import sqlalchemy as sa
         with db.engine.begin() as conn:
             if db.engine.dialect.name == "postgresql":
@@ -98,10 +98,11 @@ with app.app_context():
                 cols = [c[1] for c in conn.execute(sa.text("PRAGMA table_info(messages);")).fetchall()]
                 if cols and "reply_to_id" not in cols:
                     conn.execute(sa.text("ALTER TABLE messages ADD COLUMN reply_to_id INTEGER;"))
-        print("[OK] reply_to_id column verified/created in database.")
+        print("[OK] Database tables created/verified and reply_to_id column ready.")
     except Exception as e:
-        print(f"[DB SCHEMA CHECK] Error: {e}")
-    print("[OK] Database tables created/verified.")
+        import traceback
+        print(f"[DB SETUP ERROR]: {e}")
+        traceback.print_exc()
 
 
 # ---------------------------------------------------------------------------
